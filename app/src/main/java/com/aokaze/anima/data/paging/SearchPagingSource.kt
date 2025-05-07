@@ -4,7 +4,8 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.aokaze.anima.data.entities.Anime
 import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class SearchPagingSource(
     private val postgrest: Postgrest,
@@ -18,24 +19,26 @@ class SearchPagingSource(
         try {
             val currentPage = params.key ?: 0
             val pageSize = params.loadSize
+            val offset = currentPage * pageSize
 
-            val rangeFrom = currentPage.toLong() * pageSize.toLong()
-            val rangeTo = rangeFrom + pageSize.toLong() - 1
+            val rpcParams = buildJsonObject {
+                put("search_term", query)
+                put("page_limit", pageSize)
+                put("page_offset", offset)
+            }
 
-            val response = postgrest.from("animes")
-                .select {
-                    filter { ilike("title", "%$query%") }
-                    range(rangeFrom, rangeTo)
-                    order("created_at", Order.DESCENDING)
-                }
-                .decodeList<Anime>()
+            val response = postgrest.rpc(
+                function = "search_animes_advanced",
+                parameters = rpcParams
+            ).decodeList<Anime>()
 
             val prevKey = if (currentPage > 0) currentPage - 1 else null
             val nextKey = if (response.size == pageSize) currentPage + 1 else null
 
             return LoadResult.Page(data = response, prevKey = prevKey, nextKey = nextKey)
         } catch (e: Exception) {
-            println("Error in SearchAnimePagingSource: ${e.message}")
+            println("Error in SearchPagingSource calling RPC: ${e.message} - ${e.cause}")
+            e.printStackTrace()
             return LoadResult.Error(e)
         }
     }

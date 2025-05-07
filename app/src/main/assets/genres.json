@@ -1,0 +1,20 @@
+[
+  { "slug": "action", "name": "Acción" },
+  { "slug": "adventure", "name": "Aventura" },
+  { "slug": "comedy", "name": "Comedia" },
+  { "slug": "drama", "name": "Drama" },
+  { "slug": "ecchi", "name": "Ecchi" },
+  { "slug": "fantasy", "name": "Fantasía" },
+  { "slug": "horror", "name": "Terror" },
+  { "slug": "mahou-shoujo", "name": "Mahou Shoujo" },
+  { "slug": "mecha", "name": "Mecha" },
+  { "slug": "music", "name": "Música" },
+  { "slug": "mystery", "name": "Misterio" },
+  { "slug": "psychological", "name": "Psicológico" },
+  { "slug": "romance", "name": "Romance" },
+  { "slug": "sci-fi", "name": "Sci-Fi" },
+  { "slug": "slice-of-life", "name": "Cosas de la vida" },
+  { "slug": "sports", "name": "Deportes" },
+  { "slug": "supernatural", "name": "Sobrenatural" },
+  { "slug": "thriller", "name": "Thriller" }
+]

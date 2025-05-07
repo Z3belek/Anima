@@ -1,3 +1,16 @@
 <resources>
     <string name="app_name">Anima</string>
+    <string name="anima_logo_text">ANIMA</string>
+    <string name="watch_now">Ver ahora</string>
+    <string name="message_loading">Cargando…</string>
+    <string name="message_error">Oops, algo salió mal...</string>
+    <string name="studio">Estudios</string>
+    <string name="episodes"><![CDATA[Episodios]]></string>
+    <string name="demography">Demografía</string>
+    <string name="release_date">Fecha de estreno</string>
+    <string name="episode_prefix">Episodio %1$d</string>
+    <string name="episode_thumbnail_content_description">Miniatura del episodio %1$d</string>
+    <string name="ad">Anuncio</string>
+    <string name="live">En vivo</string>
+    <string name="search_screen_et_placeholder">Buscar animes, peliculas, y más…</string>
 </resources>
