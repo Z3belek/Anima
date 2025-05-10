@@ -1,13 +1,14 @@
 package com.aokaze.anima.presentation.screens.detail
 
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aokaze.anima.data.entities.Anime
 import com.aokaze.anima.data.entities.Episode
+import com.aokaze.anima.data.entities.Resume
 import com.aokaze.anima.data.repositories.AnimeRepository
 import com.aokaze.anima.data.repositories.EpisodeRepository
+import com.aokaze.anima.data.repositories.ResumeRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -23,38 +24,42 @@ import javax.inject.Inject
 class MediaDetailsScreenViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val animeRepository: AnimeRepository,
-    private val episodeRepository: EpisodeRepository
+    private val episodeRepository: EpisodeRepository,
+    private val resumeRepository: ResumeRepository
 ) : ViewModel() {
 
     private val animeIdFlow: Flow<String> = savedStateHandle
-        .getStateFlow<String?>(MediaDetailsScreen.MediaIdBundleKey, null)
+        .getStateFlow<String?>(MediaDetailsScreen.MEDIA_ID_BUNDLE_KEY, null)
         .filterNotNull()
 
     val uiState: Flow<MediaDetailsScreenUiState> = animeIdFlow
         .map { id ->
-            Log.d("MediaDetailsVM", "Fetching details for ID (slug): $id")
             try {
                 coroutineScope {
                     val animeDetailsDeferred = async { animeRepository.getAnimeDetails(animeId = id) }
                     val episodesDeferred = async { episodeRepository.getEpisodesForAnime(animeSlug = id) }
-
+                    val resumeInfoDeferred = async { resumeRepository.getLatestResumeForAnime(animeSlug = id) }
                     val animeDetails: Anime? = animeDetailsDeferred.await()
                     val episodes: List<Episode> = episodesDeferred.await()
+                    val resumeInfo: Resume? = resumeInfoDeferred.await()
 
                     if (animeDetails != null) {
-                        Log.d("MediaDetailsVM", "Success fetching details for ID: $id. Episodes found: ${episodes.size}")
-                        MediaDetailsScreenUiState.Done(anime = animeDetails, episodes = episodes)
+                        val firstEpisodeSlug = episodes.firstOrNull()?.id
+
+                        MediaDetailsScreenUiState.Done(
+                            anime = animeDetails,
+                            episodes = episodes,
+                            resumeInfo = resumeInfo,
+                            firstEpisodeSlug = firstEpisodeSlug
+                        )
                     } else {
-                        Log.e("MediaDetailsVM", "Failed to fetch Anime details for ID: $id")
                         MediaDetailsScreenUiState.Error("Anime details not found")
                     }
                 }
             } catch (e: Exception) {
-                Log.e("MediaDetailsVM", "Error fetching details for ID: $id", e)
                 MediaDetailsScreenUiState.Error(e.localizedMessage ?: "Unknown error")
             }
         }.catch { e ->
-            Log.e("MediaDetailsVM", "Error in UI state flow", e)
             emit(MediaDetailsScreenUiState.Error(e.localizedMessage ?: "Flow error"))
         }.stateIn(
             scope = viewModelScope,
@@ -66,5 +71,5 @@ class MediaDetailsScreenViewModel @Inject constructor(
 sealed class MediaDetailsScreenUiState {
     data object Loading : MediaDetailsScreenUiState()
     data class Error(val message: String) : MediaDetailsScreenUiState()
-    data class Done(val anime: Anime, val episodes: List<Episode>) : MediaDetailsScreenUiState()
+    data class Done(val anime: Anime, val episodes: List<Episode>, val resumeInfo: Resume? = null, val firstEpisodeSlug: String? = null) : MediaDetailsScreenUiState()
 }

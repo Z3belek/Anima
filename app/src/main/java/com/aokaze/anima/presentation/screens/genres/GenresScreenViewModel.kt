@@ -23,7 +23,7 @@ class GenresScreenViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val genreDataReader = CachedDataReader {
-        readGenreData(assetsReader, StringConstants.Assets.Genres)
+        readGenreData(assetsReader, StringConstants.Assets.GENRES)
     }
 
     val uiState: StateFlow<GenresScreenUiState> = flow {

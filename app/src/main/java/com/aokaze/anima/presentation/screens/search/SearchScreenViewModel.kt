@@ -30,7 +30,7 @@ class SearchScreenViewModel @Inject constructor(
     private val _searchState = MutableStateFlow<SearchUiState>(SearchUiState.Empty)
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
 
-    @OptIn(ExperimentalCoroutinesApi::class)
+    @OptIn(kotlinx.coroutines.FlowPreview::class, ExperimentalCoroutinesApi::class)
     val searchResults: Flow<PagingData<Anime>> = searchQuery
         .debounce(3000)
         .filter { query ->

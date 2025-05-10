@@ -1,6 +1,5 @@
 package com.aokaze.anima.presentation
 
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +29,7 @@ fun App(onBackPressed: () -> Unit) {
             composable(
                 route = Screens.AnimesGenreList(),
                 arguments = listOf(
-                    navArgument(AnimesGenreListScreen.GenreIdBundleKey) {
+                    navArgument(AnimesGenreListScreen.GENRE_ID_BUNDLE_KEY) {
                         type = NavType.StringType
                     }
                 )
@@ -51,15 +50,18 @@ fun App(onBackPressed: () -> Unit) {
             composable(
                 route = Screens.AnimeDetails(),
                 arguments = listOf(
-                    navArgument(MediaDetailsScreen.MediaIdBundleKey) {
+                    navArgument(MediaDetailsScreen.MEDIA_ID_BUNDLE_KEY) {
                         type = NavType.StringType
                     }
                 )
             ) { backStackEntry ->
                 MediaDetailsScreen(
-                    onEpisodeSelected = { episodeId ->
-                        Log.d("AppNavigation", "Navigating to VideoPlayer with episodeId: $episodeId")
-                        navController.navigate(Screens.Player.withArgs(episodeId))
+                    onEpisodeSelected = { episodeSlug, startTimeMillis ->
+                        var playerRoute = Screens.Player.withArgs(episodeSlug)
+                        if (startTimeMillis > 0L) {
+                            playerRoute += "?${PlayerScreen.INITIAL_SEEK_TIME_MILLIS_KEY}=${startTimeMillis}"
+                        }
+                        navController.navigate(playerRoute)
                     },
                     onBackPressed = {
                         if (navController.navigateUp()) {
@@ -80,6 +82,13 @@ fun App(onBackPressed: () -> Unit) {
                             Screens.AnimeDetails.withArgs(animeId)
                         )
                     },
+                    openPlayer = { episodeSlug, startTimeMillis ->
+                        var playerRoute = Screens.Player.withArgs(episodeSlug)
+                        if (startTimeMillis > 0L) {
+                            playerRoute += "?${PlayerScreen.INITIAL_SEEK_TIME_MILLIS_KEY}=${startTimeMillis}"
+                        }
+                        navController.navigate(playerRoute)
+                    },
                     onBackPressed = onBackPressed,
                     isComingBackFromDifferentScreen = isComingBackFromDifferentScreen,
                     resetIsComingBackFromDifferentScreen = {
@@ -88,10 +97,15 @@ fun App(onBackPressed: () -> Unit) {
                 )
             }
             composable(
-                route = Screens.Player(),
+                route = Screens.Player.name + "/{${PlayerScreen.EPISODE_ID_BUNDLE_KEY}}" +
+                        "?${PlayerScreen.INITIAL_SEEK_TIME_MILLIS_KEY}={${PlayerScreen.INITIAL_SEEK_TIME_MILLIS_KEY}}",
                 arguments = listOf(
-                    navArgument(PlayerScreen.EpisodeIdBundleKey) {
+                    navArgument(PlayerScreen.EPISODE_ID_BUNDLE_KEY) {
                         type = NavType.StringType
+                    },
+                    navArgument(PlayerScreen.INITIAL_SEEK_TIME_MILLIS_KEY) {
+                        type = NavType.LongType
+                        defaultValue = 0L
                     }
                 )
             ) {

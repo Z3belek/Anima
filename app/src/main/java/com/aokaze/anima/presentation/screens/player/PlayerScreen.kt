@@ -22,10 +22,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,16 +35,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.PlayerSurface
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
+import com.aokaze.anima.R
 import com.aokaze.anima.data.entities.DirectSource
 import com.aokaze.anima.data.entities.Episode
 import com.aokaze.anima.presentation.screens.player.components.PlayerControls
@@ -58,9 +63,12 @@ import com.aokaze.anima.presentation.screens.player.components.rememberPlayer
 import com.aokaze.anima.presentation.screens.player.components.rememberPlayerPulseState
 import com.aokaze.anima.presentation.screens.player.components.rememberPlayerState
 import com.aokaze.anima.presentation.utils.handleDPadKeyEvents
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 object PlayerScreen {
-    const val EpisodeIdBundleKey = "episodeSlug"
+    const val EPISODE_ID_BUNDLE_KEY = "episodeSlug"
+    const val INITIAL_SEEK_TIME_MILLIS_KEY = "startTimeMillis"
 }
 
 @Composable
@@ -72,7 +80,7 @@ fun PlayerScreen(
 
     when (val s = uiState) {
         is PlayerScreenUiState.Loading -> {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) { // Fondo negro para Loading
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
@@ -83,16 +91,15 @@ fun PlayerScreen(
                 }
             } else {
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-                    Text(text = s.message ?: "Ocurrió un error.", color = Color.White)
+                    Text(text = s.message ?: stringResource(R.string.player_error_unknown), color = Color.White)
                 }
             }
         }
         is PlayerScreenUiState.Done -> {
             PlayerScreenContent(
                 uiState = s,
-                onBackPressed = onBackPressed,
-                onLoadEpisodeBySlug = playerScreenViewModel::loadEpisodeBySlug,
-                onSelectVideoSource = playerScreenViewModel::selectVideoSource
+                viewModel = playerScreenViewModel,
+                onBackPressed = onBackPressed
             )
         }
     }
@@ -102,9 +109,8 @@ fun PlayerScreen(
 @Composable
 fun PlayerScreenContent(
     uiState: PlayerScreenUiState.Done,
-    onBackPressed: () -> Unit,
-    onLoadEpisodeBySlug: (String) -> Unit,
-    onSelectVideoSource: (String) -> Unit
+    viewModel: PlayerScreenViewModel,
+    onBackPressed: () -> Unit
 ) {
     val context = LocalContext.current
     val exoPlayer = rememberPlayer(context)
@@ -112,41 +118,93 @@ fun PlayerScreenContent(
     val pulseState = rememberPlayerPulseState()
 
     var showSourceSelectorDialog by remember { mutableStateOf(false) }
-    var currentPlaybackPosition by remember { mutableLongStateOf(0L) }
+    var initialSeekPerformedForCurrentMedia by remember(uiState.currentEpisode.id, uiState.selectedSourceUrl) { mutableStateOf(false) }
+    val currentInitialSeekTime by remember(uiState.currentEpisode.id, uiState.selectedSourceUrl) { derivedStateOf { viewModel.initialSeekTimeMillis } }
 
-    LaunchedEffect(uiState.currentEpisode.id, uiState.selectedSourceUrl) {
-        val previousMediaId = exoPlayer.currentMediaItem?.mediaId
-        val isChangingSourceOnly = previousMediaId == uiState.currentEpisode.id &&
-                exoPlayer.currentMediaItem?.requestMetadata?.mediaUri.toString() != uiState.selectedSourceUrl
 
-        if (isChangingSourceOnly) {
-            currentPlaybackPosition = exoPlayer.currentPosition
-        } else {
-            currentPlaybackPosition = 0L
-        }
-
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
+    LaunchedEffect(uiState.currentEpisode.id, uiState.selectedSourceUrl, exoPlayer) {
         val mediaItem = uiState.currentEpisode.intoMediaItem(uiState.selectedSourceUrl)
         if (mediaItem != null) {
             exoPlayer.setMediaItem(mediaItem)
             exoPlayer.prepare()
-            if (currentPlaybackPosition > 0) {
-                exoPlayer.seekTo(currentPlaybackPosition)
-            }
             exoPlayer.playWhenReady = true
+            initialSeekPerformedForCurrentMedia = false
         } else {
+            viewModel.playerIsClosing(exoPlayer.currentPosition, exoPlayer.duration.coerceAtLeast(0L))
             onBackPressed()
         }
     }
 
     DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    val duration = exoPlayer.duration.coerceAtLeast(0L)
+                    viewModel.onPlayerReady(duration)
+
+                    if (!initialSeekPerformedForCurrentMedia && currentInitialSeekTime > 0) {
+                        exoPlayer.seekTo(currentInitialSeekTime)
+                        initialSeekPerformedForCurrentMedia = true
+                    }
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playerState.showControls(isPlaying)
+                if (!isPlaying && exoPlayer.playbackState == Player.STATE_READY && exoPlayer.currentPosition > 0) {
+                    viewModel.saveCurrentPlayerState(exoPlayer.currentPosition, exoPlayer.duration.coerceAtLeast(0L))
+                }
+            }
+        }
+        exoPlayer.addListener(listener)
         onDispose {
+            exoPlayer.removeListener(listener)
+        }
+    }
+
+    LaunchedEffect(exoPlayer, viewModel) {
+        while (isActive) {
+            if (exoPlayer.isPlaying) {
+                viewModel.updateCurrentPlayerPosition(exoPlayer.currentPosition)
+            }
+            delay(1000L)
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, exoPlayer, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    if (exoPlayer.isPlaying) {
+                        exoPlayer.pause()
+                    } else if (exoPlayer.playbackState == Player.STATE_READY && exoPlayer.currentPosition > 0) {
+                        viewModel.saveCurrentPlayerState(exoPlayer.currentPosition, exoPlayer.duration.coerceAtLeast(0L))
+                    }
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    viewModel.playerIsClosing(exoPlayer.currentPosition, exoPlayer.duration.coerceAtLeast(0L))
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    if (exoPlayer.playbackState == Player.STATE_READY && !exoPlayer.playWhenReady && exoPlayer.currentMediaItem != null) {
+                        exoPlayer.play()
+                    }
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            viewModel.playerIsClosing(exoPlayer.currentPosition, exoPlayer.duration.coerceAtLeast(0L))
+            lifecycleOwner.lifecycle.removeObserver(observer)
             exoPlayer.release()
         }
     }
 
-    BackHandler(onBack = onBackPressed)
+    BackHandler {
+        viewModel.playerIsClosing(exoPlayer.currentPosition, exoPlayer.duration.coerceAtLeast(0L))
+        onBackPressed()
+    }
 
     Box(
         Modifier
@@ -168,28 +226,32 @@ fun PlayerScreenContent(
             isPlaying = exoPlayer.isPlaying,
             isControlsVisible = playerState.isControlsVisible,
             centerButton = { PlayerPulse(pulseState) },
-            subtitles = { /* TODO Implementar subtítulos si es necesario */ },
+            subtitles = { /* TODO: Add subtitles */ },
             showControls = { playerState.showControls(exoPlayer.isPlaying) },
             controls = {
                 PlayerControls(
                     player = exoPlayer,
-                    title = uiState.currentEpisode.animeTitle ?: "Anime Desconocido",
-                    subtitle = "Ep. ${uiState.currentEpisode.number ?: "-"} - ${uiState.currentEpisode.title ?: "Episodio Desconocido"}",
+                    title = uiState.currentEpisode.animeTitle ?: stringResource(R.string.default_anime_title),
+                    subtitle = buildString {
+                        append(stringResource(R.string.episode_prefix_simple, uiState.currentEpisode.number ?: 0))
+                        uiState.currentEpisode.title?.takeIf { it.isNotBlank() }?.let {
+                            append(" - ")
+                            append(it)
+                        }
+                    },
                     showPreviousButton = uiState.previousEpisode != null,
                     showNextButton = uiState.nextEpisode != null,
                     onPreviousClicked = {
                         uiState.previousEpisode?.id?.let {
-                            onLoadEpisodeBySlug(it)
+                            viewModel.loadEpisodeBySlug(it, exoPlayer.currentPosition, exoPlayer.duration.coerceAtLeast(0L))
                         }
                     },
                     onNextClicked = {
                         uiState.nextEpisode?.id?.let {
-                            onLoadEpisodeBySlug(it)
+                            viewModel.loadEpisodeBySlug(it, exoPlayer.currentPosition, exoPlayer.duration.coerceAtLeast(0L))
                         }
                     },
-                    onSettingsClicked = {
-                        showSourceSelectorDialog = true
-                    },
+                    onSettingsClicked = { showSourceSelectorDialog = true },
                     focusRequester = focusRequester,
                     onShowControls = { playerState.showControls(exoPlayer.isPlaying) },
                 )
@@ -198,19 +260,17 @@ fun PlayerScreenContent(
 
         if (showSourceSelectorDialog) {
             SourceSelectionDialog(
-                availableSources = uiState.currentEpisode.directSources?.filterNotNull() ?: emptyList(),
+                availableSources = uiState.currentEpisode.directSources ?: emptyList(),
                 selectedSourceUrl = uiState.selectedSourceUrl,
                 onSourceSelected = { selectedSource ->
-                    selectedSource.url?.let {
-                        if (it.isNotBlank()) {
-                            onSelectVideoSource(it)
+                    selectedSource.url?.let { newSourceUrl ->
+                        if (newSourceUrl.isNotBlank() && newSourceUrl != uiState.selectedSourceUrl) {
+                            viewModel.selectVideoSource(newSourceUrl, exoPlayer.currentPosition, exoPlayer.duration.coerceAtLeast(0L))
                         }
                     }
                     showSourceSelectorDialog = false
                 },
-                onDismiss = {
-                    showSourceSelectorDialog = false
-                }
+                onDismiss = { showSourceSelectorDialog = false }
             )
         }
     }
@@ -251,7 +311,7 @@ fun SourceSelectionDialog(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Seleccionar Fuente",
+                text = stringResource(R.string.player_source_dialog_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 20.dp)
@@ -276,7 +336,7 @@ fun SourceSelectionDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = source.type ?: "Fuente ${index + 1}",
+                            text = stringResource(R.string.player_source_dialog_item_prefix, index + 1),
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -291,7 +351,7 @@ fun SourceSelectionDialog(
                 onClick = onDismiss,
                 modifier = Modifier.align(Alignment.End)
             ) {
-                Text("Cancelar", color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.player_source_dialog_cancel), color = MaterialTheme.colorScheme.primary)
             }
         }
     }

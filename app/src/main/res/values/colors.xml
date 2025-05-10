@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="anima_background">#1A1C1E</color>
-    <color name="primary">#A8C8FF</color>
+    <color name="primary">#ec003f</color>
     <color name="onPrimary">#003062</color>
     <color name="primaryContainer">#00468A</color>
     <color name="onPrimaryContainer">#D6E3FF</color>

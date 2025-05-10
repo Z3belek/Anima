@@ -1,6 +1,5 @@
 package com.aokaze.anima.presentation.screens.detail
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +13,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -24,6 +24,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -40,20 +41,64 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aokaze.anima.R
 import com.aokaze.anima.data.entities.Anime
+import com.aokaze.anima.data.entities.Genre
+import com.aokaze.anima.data.entities.Resume
 import com.aokaze.anima.data.util.StringConstants
+import com.aokaze.anima.presentation.screens.dashboard.closeDrawerWidth
 import com.aokaze.anima.presentation.screens.dashboard.rememberChildPadding
 import com.aokaze.anima.presentation.theme.AnimaButtonShape
 import kotlinx.coroutines.launch
+import kotlinx.io.IOException
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
 
-@OptIn(ExperimentalFoundationApi::class)
+private fun loadGenreDisplayMap(context: android.content.Context): Map<String, String> {
+    return try {
+        val jsonString = context.assets.open("genres.json").bufferedReader().use { it.readText() }
+        val genreList = Json.decodeFromString<List<Genre>>(jsonString)
+        genreList.associate { it.slug to it.name }
+    } catch (e: IOException) {
+        emptyMap()
+    } catch (e: SerializationException) {
+        emptyMap()
+    }
+}
+
 @Composable
 fun MediaDetails(
     anime: Anime,
-    onPlayFirstEpisode: () -> Unit
+    resumeData: Resume?,
+    firstEpisodeSlug: String?,
+    onPlayEpisode: (episodeSlug: String, startTimeMillis: Long) -> Unit
 ) {
     val childPadding = rememberChildPadding()
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val coroutineScope = rememberCoroutineScope()
+
+    val context = LocalContext.current
+    val genreDisplayMap = remember { loadGenreDisplayMap(context) }
+
+    val buttonText: String
+    val buttonIcon: ImageVector
+    val playAction: () -> Unit
+    var buttonEnabled = true
+
+    if (resumeData != null) {
+        buttonText = stringResource(R.string.continue_watching)
+        buttonIcon = Icons.Outlined.Replay
+        playAction = { onPlayEpisode(resumeData.episodeSlug, resumeData.currentPositionMillis) }
+    } else {
+        if (firstEpisodeSlug != null) {
+            buttonText = stringResource(R.string.watch_now)
+            buttonIcon = Icons.Outlined.PlayArrow
+            playAction = { onPlayEpisode(firstEpisodeSlug, 0L) }
+        } else {
+            buttonText = stringResource(R.string.play_unavailable)
+            buttonIcon = Icons.Outlined.PlayArrow
+            playAction = { /* TODO: ? */ }
+            buttonEnabled = false
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -69,7 +114,7 @@ fun MediaDetails(
         Column(modifier = Modifier.fillMaxWidth(0.75f)) {
             Spacer(modifier = Modifier.height(108.dp))
             Column(
-                modifier = Modifier.padding(start = childPadding.start)
+                modifier = Modifier.padding(start = childPadding.start + closeDrawerWidth)
             ) {
                 MediaLargeTitle(mediaTitle = anime.title)
 
@@ -77,27 +122,34 @@ fun MediaDetails(
                     modifier = Modifier.alpha(0.75f)
                 ) {
                     MediaDescription(description = anime.synopsis ?: "")
+                    val displayGenres = anime.genres?.mapNotNull { slug ->
+                        genreDisplayMap[slug]
+                    }?.joinToString(", ")?.takeIf { it.isNotBlank() }
+
                     DotSeparatedRow(
                         modifier = Modifier.padding(top = 20.dp),
                         texts = listOfNotNull(
                             anime.type?.takeIf { it.isNotBlank() },
-                            anime.genres?.joinToString(", ")?.takeIf { it.isNotBlank() },
+                            displayGenres,
                             anime.duration?.takeIf { it.isNotBlank() }
                         )
                     )
                     ExtraDetailsRow(
                         studios = anime.studios?.mapNotNull { it.name }?.joinToString(", ") ?: "",
                         demography = anime.demography?.mapNotNull { it.name }?.joinToString(", ") ?: "",
-                        date = anime.broadcast ?: "" // O usar anime.year si es más apropiado
+                        date = anime.broadcast ?: ""
                     )
                 }
-                PlayFirstEpisodeButton( // Renombrar botón
+                PlayEpisodeButtonComposable(
                     modifier = Modifier.onFocusChanged {
                         if (it.isFocused) {
                             coroutineScope.launch { bringIntoViewRequester.bringIntoView() }
                         }
                     },
-                    onPlayClick = onPlayFirstEpisode // Usar lambda recibida
+                    buttonText = buttonText,
+                    buttonIcon = buttonIcon,
+                    onPlayClick = playAction,
+                    enabled = buttonEnabled
                 )
             }
         }
@@ -105,23 +157,28 @@ fun MediaDetails(
 }
 
 @Composable
-private fun PlayFirstEpisodeButton(
+private fun PlayEpisodeButtonComposable(
     modifier: Modifier = Modifier,
-    onPlayClick: () -> Unit
+    buttonText: String,
+    buttonIcon: ImageVector,
+    onPlayClick: () -> Unit,
+    enabled: Boolean = true
 ) {
     Button(
         onClick = onPlayClick,
+        enabled = enabled,
         modifier = modifier.padding(top = 24.dp),
         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-        shape = ButtonDefaults.shape(shape = AnimaButtonShape)
+        shape = ButtonDefaults.shape(shape = AnimaButtonShape),
+        scale = ButtonDefaults.scale(focusedScale = 1f)
     ) {
         Icon(
-            imageVector = Icons.Outlined.PlayArrow,
+            imageVector = buttonIcon,
             contentDescription = null
         )
         Spacer(Modifier.size(8.dp))
         Text(
-            text = stringResource(R.string.watch_now),
+            text = buttonText,
             style = MaterialTheme.typography.titleSmall
         )
     }

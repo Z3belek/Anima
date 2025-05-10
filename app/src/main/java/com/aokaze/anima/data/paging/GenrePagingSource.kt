@@ -42,8 +42,6 @@ class GenrePagingSource(
 
             return LoadResult.Page(data = response, prevKey = prevKey, nextKey = nextKey)
         } catch (e: Exception) {
-            println("Error in GenrePagingSource RPC for genre $genreName: ${e.message}")
-            e.printStackTrace()
             return LoadResult.Error(e)
         }
     }

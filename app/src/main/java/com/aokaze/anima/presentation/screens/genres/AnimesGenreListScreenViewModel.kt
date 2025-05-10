@@ -28,7 +28,7 @@ class AnimesGenreListScreenViewModel @Inject constructor(
     application: Application
 ) : ViewModel() {
 
-    private val genreId: StateFlow<String> = savedStateHandle.getStateFlow(AnimesGenreListScreen.GenreIdBundleKey, "")
+    private val genreId: StateFlow<String> = savedStateHandle.getStateFlow(AnimesGenreListScreen.GENRE_ID_BUNDLE_KEY, "")
 
     private val allGenres: List<Genre> by lazy {
         try {
@@ -37,7 +37,6 @@ class AnimesGenreListScreenViewModel @Inject constructor(
                 .use { it.readText() }
             Json.decodeFromString<List<Genre>>(jsonString)
         } catch (e: Exception) {
-            println("Error loading genres.json: ${e.message}")
             emptyList()
         }
     }
@@ -48,7 +47,7 @@ class AnimesGenreListScreenViewModel @Inject constructor(
 
     val displayGenreName: StateFlow<String> = genreId
         .map { slug ->
-            genreIdMap[slug] ?: slug.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } // O un fallback mejor
+            genreIdMap[slug] ?: slug.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
         }
         .stateIn(
             scope = viewModelScope,

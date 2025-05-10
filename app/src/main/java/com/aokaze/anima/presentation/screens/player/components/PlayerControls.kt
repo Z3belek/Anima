@@ -65,23 +65,23 @@ fun PlayerControls(
                     icon = Icons.Default.AutoAwesomeMotion,
                     isPlaying = isPlaying,
                     contentDescription =
-                        StringConstants.Composable.PlayerControlPlaylistButton,
+                        StringConstants.Composable.PLAYLIST,
                     onShowControls = onShowControls,
-                    onClick = { /* TODO: Futura funcionalidad */ }
+                    onClick = { /* TODO: Add playlist */ }
                 )
                 PlayerControlsIcon(
                     icon = Icons.Default.ClosedCaption,
                     isPlaying = isPlaying,
                     contentDescription =
-                        StringConstants.Composable.PlayerControlClosedCaptionsButton,
+                        StringConstants.Composable.CLOSED_CAPTIONS,
                     onShowControls = onShowControls,
-                    onClick = { /* TODO: Implementar subtítulos */ }
+                    onClick = { /* TODO: Add subtitles */ }
                 )
                 PlayerControlsIcon(
                     icon = Icons.Default.Settings,
                     isPlaying = isPlaying,
                     contentDescription =
-                        StringConstants.Composable.PlayerControlSettingsButton,
+                        StringConstants.Composable.SETTINGS,
                     onShowControls = onShowControls,
                     onClick = onSettingsClicked
                 )

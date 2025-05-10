@@ -8,27 +8,17 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
@@ -53,29 +43,15 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.aokaze.anima.R
 import com.aokaze.anima.data.entities.Anime
-import com.aokaze.anima.presentation.common.AnimeCard
-import com.aokaze.anima.presentation.common.PosterImage
-import com.aokaze.anima.presentation.screens.dashboard.rememberChildPadding
+import com.aokaze.anima.presentation.common.AnimeGrid
+import com.aokaze.anima.presentation.screens.dashboard.closeDrawerWidth
 import com.aokaze.anima.presentation.theme.AnimaCardShape
 
 @Composable
 fun SearchScreen(
     onAnimeClick: (anime: Anime) -> Unit,
-    onScroll: (isTopBarVisible: Boolean) -> Unit,
     searchScreenViewModel: SearchScreenViewModel = hiltViewModel(),
 ) {
-    val gridState = rememberLazyGridState()
-    val shouldShowTopBar by remember {
-        derivedStateOf {
-            gridState.firstVisibleItemIndex == 0 &&
-                    gridState.firstVisibleItemScrollOffset < 100
-        }
-    }
-
-    LaunchedEffect(shouldShowTopBar) {
-        onScroll(shouldShowTopBar)
-    }
-
     val searchQuery by searchScreenViewModel.searchQuery.collectAsStateWithLifecycle()
     val searchUiState by searchScreenViewModel.searchState.collectAsStateWithLifecycle()
     val searchResults = searchScreenViewModel.searchResults.collectAsLazyPagingItems()
@@ -86,11 +62,9 @@ fun SearchScreen(
         searchUiState = searchUiState,
         searchResults = searchResults,
         onAnimeClick = onAnimeClick,
-        gridState = gridState
     )
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SearchResultContent(
     searchQuery: String,
@@ -99,16 +73,18 @@ fun SearchResultContent(
     searchResults: LazyPagingItems<Anime>,
     onAnimeClick: (anime: Anime) -> Unit,
     modifier: Modifier = Modifier,
-    gridState: LazyGridState = rememberLazyGridState(),
 ) {
-    val childPadding = rememberChildPadding()
     val tfFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val tfInteractionSource = remember { MutableInteractionSource() }
     val isTfFocused by tfInteractionSource.collectIsFocusedAsState()
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(top = 60.dp)
+    ) {
         Surface(
             shape = ClickableSurfaceDefaults.shape(shape = AnimaCardShape),
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
@@ -126,7 +102,7 @@ fun SearchResultContent(
                         color = animateColorAsState(
                             targetValue = if (isTfFocused) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.border,
-                            label = ""
+                            label = "search_tf_border"
                         ).value
                     ),
                     shape = AnimaCardShape
@@ -134,7 +110,8 @@ fun SearchResultContent(
             ),
             tonalElevation = 2.dp,
             modifier = Modifier
-                .padding(horizontal = childPadding.start)
+                .padding(end = closeDrawerWidth)
+                .padding(horizontal = 0.dp)
                 .padding(top = 8.dp, bottom = 8.dp),
             onClick = { tfFocusRequester.requestFocus() }
         ) {
@@ -169,8 +146,7 @@ fun SearchResultContent(
                                     return@onKeyEvent true
                                 }
                                 KeyEvent.KEYCODE_DPAD_UP -> {
-                                    focusManager.moveFocus(FocusDirection.Up)
-                                    return@onKeyEvent true
+                                    // TODO: Add logic to move focus up
                                 }
                                 KeyEvent.KEYCODE_BACK -> {
                                     focusManager.clearFocus(true)
@@ -204,93 +180,45 @@ fun SearchResultContent(
             )
         }
 
-        when (searchUiState) {
-            SearchUiState.Empty -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Ingresa un término para buscar.", style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-            SearchUiState.Searching -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-            SearchUiState.Success -> {
-                if (searchResults.itemCount == 0 && searchQuery.isNotBlank() && searchResults.loadState.refresh is LoadState.NotLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(end = closeDrawerWidth)
+                .padding(top = 8.dp)
+        ) {
+            when (searchUiState) {
+                SearchUiState.Empty -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No se encontraron resultados para \"$searchQuery\".", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.search_enter_term), style = MaterialTheme.typography.bodyLarge)
                     }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 160.dp),
-                        state = gridState,
-                        contentPadding = PaddingValues(
-                            start = childPadding.start,
-                            end = childPadding.end,
-                            top = 8.dp,
-                            bottom = childPadding.bottom
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.fillMaxSize()
+                }
+                SearchUiState.Searching -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        items(searchResults.itemCount) { index ->
-                            val anime = searchResults[index]
-                            if (anime != null) {
-                                AnimeCard(
-                                    onClick = { onAnimeClick(anime) },
-                                    modifier = Modifier
-                                        .aspectRatio(1 / 1.5f)
-                                        .padding(8.dp)
-                                ) {
-                                    PosterImage(anime = anime, modifier = Modifier.fillMaxSize())
-                                }
-                            }
+                        CircularProgressIndicator()
+                    }
+                }
+                SearchUiState.Success -> {
+                    if (searchResults.loadState.refresh is LoadState.NotLoading && searchResults.itemCount == 0 && searchQuery.isNotBlank()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize().padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(stringResource(R.string.search_no_results, searchQuery), style = MaterialTheme.typography.bodyLarge)
                         }
-                        searchResults.apply {
-                            when {
-                                loadState.append is LoadState.Loading -> {
-                                    item(span = { GridItemSpan(maxLineSpan) }) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(16.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            CircularProgressIndicator()
-                                        }
-                                    }
-                                }
-                                loadState.append is LoadState.Error -> {
-                                    val e = searchResults.loadState.append as LoadState.Error
-                                    item(span = { GridItemSpan(maxLineSpan) }) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(16.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text("Error al cargar más: ${e.error.localizedMessage}", color = MaterialTheme.colorScheme.error)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    } else {
+                        AnimeGrid(
+                            items = searchResults,
+                            onAnimeClick = onAnimeClick,
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                 }
             }

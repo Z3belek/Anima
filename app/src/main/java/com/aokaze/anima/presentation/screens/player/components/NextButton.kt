@@ -23,7 +23,7 @@ fun NextButton(
         isPlaying = player.isPlaying,
         enabled = enabled,
         contentDescription =
-            StringConstants.Composable.PlayerControlSkipNextButton,
+            StringConstants.Composable.SKIP_NEXT,
         onShowControls = onShowControls,
         onClick = onClick,
         modifier = modifier

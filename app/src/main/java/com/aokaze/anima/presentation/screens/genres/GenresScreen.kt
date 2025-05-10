@@ -1,144 +1,66 @@
 package com.aokaze.anima.presentation.screens.genres
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import com.aokaze.anima.data.entities.Genre
-import com.aokaze.anima.presentation.common.AnimeCard
-import com.aokaze.anima.presentation.common.Loading
-import com.aokaze.anima.presentation.screens.dashboard.rememberChildPadding
-import com.aokaze.anima.presentation.utils.GradientBg
+import com.aokaze.anima.R
+import com.aokaze.anima.presentation.common.GenreGrid
+import com.aokaze.anima.presentation.screens.dashboard.closeDrawerWidth
 
 @Composable
 fun GenresScreen(
     gridColumns: Int = 4,
     onGenreClick: (genreName: String) -> Unit,
-    onScroll: (isTopBarVisible: Boolean) -> Unit,
     viewModel: GenresScreenViewModel = hiltViewModel()
 ) {
-
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    when (val s = uiState) {
-        GenresScreenUiState.Loading -> {
-            Loading(modifier = Modifier.fillMaxSize())
-        }
-
-        is GenresScreenUiState.Ready -> {
-            Catalog(
-                gridColumns = gridColumns,
-                genreList = s.genreList,
-                onGenreClick = onGenreClick,
-                onScroll = onScroll,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalComposeUiApi::class)
-@Composable
-private fun Catalog(
-    genreList: List<Genre>,
-    modifier: Modifier = Modifier,
-    gridColumns: Int = 4,
-    onGenreClick: (genreName: String) -> Unit,
-    onScroll: (isTopBarVisible: Boolean) -> Unit,
-) {
-    val childPadding = rememberChildPadding()
-    val lazyGridState = rememberLazyGridState()
-    val shouldShowTopBar by remember {
-        derivedStateOf {
-            lazyGridState.firstVisibleItemIndex == 0 &&
-                    lazyGridState.firstVisibleItemScrollOffset < 100
-        }
-    }
-    LaunchedEffect(shouldShowTopBar) {
-        onScroll(shouldShowTopBar)
-    }
-
-    AnimatedContent(
-        targetState = genreList,
+    Column(
         modifier = Modifier
-            .padding(horizontal = childPadding.start)
-            .padding(top = childPadding.top),
-        label = "GenreListAnimation",
-    ) { currentGenreList ->
-        LazyVerticalGrid(
-            state = lazyGridState,
-            modifier = modifier,
-            columns = GridCells.Fixed(gridColumns),
-        ) {
-            items(
-                items = currentGenreList,
-                key = { genre -> genre.slug }
-            ) { genre ->
-                // -----------------------
-                var isFocused by remember { mutableStateOf(false) }
-                val index = currentGenreList.indexOf(genre)
+            .fillMaxSize()
+            .padding(top = 60.dp, end = closeDrawerWidth),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = stringResource(R.string.genres_screen_title),
+            style = MaterialTheme.typography.displaySmall.copy(
+                fontWeight = FontWeight.SemiBold
+            ),
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 30.dp)
+        )
 
-                AnimeCard(
-                    onClick = {
-                        onGenreClick(genre.slug)
-                    },
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .aspectRatio(16 / 9f)
-                        .onFocusChanged {
-                            isFocused = it.isFocused || it.hasFocus
-                        }
-                        .focusProperties {
-                            if (index != -1 && index % gridColumns == 0) {
-                                left = FocusRequester.Cancel
-                            }
-                        }
-                ) {
-                    val itemAlpha by animateFloatAsState(
-                        targetValue = if (isFocused) 0.6f else 0.2f,
-                        label = "ItemAlphaAnimation"
-                    )
-                    val textColor = if (isFocused) Color.White else Color.White
-
-                    Box(contentAlignment = Alignment.Center) {
-                        Box(modifier = Modifier.alpha(itemAlpha)) {
-                            GradientBg()
-                        }
-                        Text(
-                            text = genre.name, // Asegúrate que Genre tenga 'name'
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                color = textColor,
-                            )
-                        )
-                    }
-                }
-            }
+        val isLoading = uiState is GenresScreenUiState.Loading
+        val genreList = if (uiState is GenresScreenUiState.Ready) {
+            (uiState as GenresScreenUiState.Ready).genreList
+        } else {
+            emptyList()
         }
+
+        GenreGrid(
+            genreList = genreList,
+            isLoading = isLoading,
+            onGenreClick = onGenreClick,
+            gridColumns = gridColumns,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(0.dp)
+        )
     }
 }

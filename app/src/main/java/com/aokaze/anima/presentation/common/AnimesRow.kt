@@ -19,7 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
@@ -41,17 +40,21 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.aokaze.anima.data.entities.Anime
+import com.aokaze.anima.presentation.common.skeleton.AnimeCardSkeleton
 import com.aokaze.anima.presentation.screens.dashboard.rememberChildPadding
+import com.aokaze.anima.presentation.theme.AnimaBorderWidth
 
 enum class ItemDirection(val aspectRatio: Float) {
     Vertical(10.5f / 16f),
     Horizontal(16f / 9f);
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
+private const val SKELETON_ROW_ITEMS = 5
+
 @Composable
 fun AnimesRow(
     animes: List<Anime>,
+    isLoading: Boolean,
     modifier: Modifier = Modifier,
     itemDirection: ItemDirection = ItemDirection.Vertical,
     startPadding: Dp = rememberChildPadding().start,
@@ -76,50 +79,72 @@ fun AnimesRow(
                 style = titleStyle,
                 modifier = Modifier
                     .alpha(1f)
-                    .padding(start = startPadding, top = 16.dp, bottom = 16.dp)
+                    .padding(start = AnimaBorderWidth, top = 16.dp, bottom = 16.dp)
             )
         }
-        AnimatedContent(
-            targetState = animes,
-            label = "",
-        ) { animeState ->
+        if (isLoading && animes.isEmpty()) {
             LazyRow(
                 contentPadding = PaddingValues(
                     start = startPadding,
                     end = endPadding,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
-                modifier = Modifier
-                    .focusRequester(lazyRow)
-                    .focusRestorer(firstItem)
+                modifier = Modifier.focusRestorer(),
+                userScrollEnabled = false
             ) {
-                itemsIndexed(animeState, key = { _, anime -> anime.id }) { index, anime ->
-                    val itemModifier = if (index == 0) {
-                        Modifier.focusRequester(firstItem)
-                    } else {
-                        Modifier
-                    }
-                    AnimesRowItem(
-                        modifier = itemModifier.then(
-                            if (itemDirection == ItemDirection.Vertical) Modifier.width(150.dp) else Modifier
-                        ),
-                        index = index,
-                        itemDirection = itemDirection,
-                        onAnimeSelected = {
-                            lazyRow.saveFocusedChild()
-                            onAnimeSelected(it)
-                        },
-                        anime = anime,
-                        showItemTitle = showItemTitle,
-                        showIndexOverImage = showIndexOverImage
+                items(SKELETON_ROW_ITEMS) {
+                    AnimeCardSkeleton(
+                        modifier = Modifier
+                            .padding(AnimaBorderWidth)
+                            .then(
+                                if (itemDirection == ItemDirection.Vertical) Modifier.width(150.dp) else Modifier
+                            )
+                            .aspectRatio(itemDirection.aspectRatio)
                     )
+                }
+            }
+        } else if (animes.isNotEmpty()) {
+            AnimatedContent(
+                targetState = animes,
+                label = "AnimesRowAnimation",
+            ) { animeState ->
+                LazyRow(
+                    contentPadding = PaddingValues(
+                        start = startPadding,
+                        end = endPadding,
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    modifier = Modifier
+                        .focusRequester(lazyRow)
+                        .focusRestorer(firstItem)
+                ) {
+                    itemsIndexed(animeState, key = { _, anime -> anime.id }) { index, anime ->
+                        val itemModifier = if (index == 0) {
+                            Modifier.focusRequester(firstItem).padding(AnimaBorderWidth)
+                        } else {
+                            Modifier.padding(AnimaBorderWidth)
+                        }
+                        AnimesRowItem(
+                            modifier = itemModifier.then(
+                                if (itemDirection == ItemDirection.Vertical) Modifier.width(150.dp) else Modifier
+                            ),
+                            index = index,
+                            itemDirection = itemDirection,
+                            onAnimeSelected = {
+                                lazyRow.saveFocusedChild()
+                                onAnimeSelected(it)
+                            },
+                            anime = anime,
+                            showItemTitle = showItemTitle,
+                            showIndexOverImage = showIndexOverImage
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ImmersiveListAnimesRow(
     animes: List<Anime>,
@@ -193,7 +218,6 @@ fun ImmersiveListAnimesRow(
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun AnimesRowItem(
     index: Int,

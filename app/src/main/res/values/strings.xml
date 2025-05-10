@@ -13,4 +13,20 @@
     <string name="ad">Anuncio</string>
     <string name="live">En vivo</string>
     <string name="search_screen_et_placeholder">Buscar animes, peliculas, y más…</string>
+    <string name="anime_screen_title">Lista de animes</string>
+    <string name="movie_screen_title">Lista de películas</string>
+    <string name="continue_watching">Continuar viendo</string>
+    <string name="episode_prefix_simple">Ep. %1$d</string>
+    <string name="player_error_unknown">Ocurrió un error desconocido.</string>
+    <string name="default_anime_title">Anime sin título</string>
+    <string name="player_source_dialog_title">Seleccionar fuente</string>
+    <string name="player_source_dialog_item_prefix">Fuente %1$d</string>
+    <string name="player_source_dialog_cancel">Cancelar</string>
+    <string name="episode_prefix_simple_plain">Ep. %1$d</string>
+    <string name="play_unavailable">Reproductor no disponible</string>
+    <string name="search_enter_term">Ingrese un término de búsqueda</string>
+    <string name="search_no_results">No se encontraron resultados</string>
+    <string name="genres_screen_title">Géneros</string>
+    <string name="details">Detalles</string>
+    <string name="continue_watching_episode_number">Continuar E%1$d</string>
 </resources>

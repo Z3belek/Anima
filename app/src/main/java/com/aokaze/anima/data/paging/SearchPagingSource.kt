@@ -37,8 +37,6 @@ class SearchPagingSource(
 
             return LoadResult.Page(data = response, prevKey = prevKey, nextKey = nextKey)
         } catch (e: Exception) {
-            println("Error in SearchPagingSource calling RPC: ${e.message} - ${e.cause}")
-            e.printStackTrace()
             return LoadResult.Error(e)
         }
     }

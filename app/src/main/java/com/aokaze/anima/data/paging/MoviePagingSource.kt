@@ -31,7 +31,6 @@ class MoviePagingSource(
 
             return LoadResult.Page(data = response, prevKey = prevKey, nextKey = nextKey)
         } catch (e: Exception) {
-            println("Error in MoviePagingSource: ${e.message}")
             return LoadResult.Error(e)
         }
     }

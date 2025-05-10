@@ -75,7 +75,7 @@ fun PlayerSeeker(
             isPlaying = player.isPlaying,
             contentDescription = StringConstants
                 .Composable
-                .PlayerControlPlayPauseButton
+                .PLAY_PAUSE
         )
         PlayerControllerText(text = contentProgressString)
         PlayerControllerIndicator(
